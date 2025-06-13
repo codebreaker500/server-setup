@@ -1,0 +1,48 @@
+name: Setup SSL Certificate
+
+on:
+  workflow_call:
+    inputs:
+      domain_name:
+        required: true
+        type: string
+
+jobs:
+  setup-ssl:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Get GitHub Email
+        id: get_email
+        run: |
+          EMAIL=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/user | jq -r '.email')
+          echo "EMAIL=$EMAIL" >> $GITHUB_ENV
+
+      - name: Install Certbot if not installed
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            if ! command -v certbot &> /dev/null; then
+              echo "Certbot not found. Installing..."
+              sudo apt update
+              sudo apt install -y software-properties-common
+              sudo add-apt-repository -y ppa:certbot/certbot
+              sudo apt update
+              sudo apt install -y certbot python3-certbot-nginx
+            else
+              echo "Certbot is already installed."
+            fi
+
+      - name: SSL Configuration
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            sudo certbot --nginx -d ${{ inputs.domain_name }} --email ${{ env.EMAIL }} --agree-tos --non-interactive

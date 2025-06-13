@@ -1,0 +1,56 @@
+name: Setup Nginx
+
+on:
+  workflow_call:
+    inputs:
+      domain_name:
+        required: true
+        type: string
+      proxy_pass:
+        required: true
+        type: string
+      proxy_pass_port:
+        required: true
+        type: string
+
+jobs:
+  setup-nginx:
+    runs-on: ubuntu-latest
+
+    env:
+      DOMAIN_NAME: ${{ inputs.domain_name }}
+      PROXY_PASS: ${{ inputs.proxy_pass }}
+      PROXY_PASS_PORT: ${{ inputs.proxy_pass_port }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Generate Nginx config
+        run: |
+          envsubst '${DOMAIN_NAME} ${PROXY_PASS} ${PROXY_PASS_PORT}' < nginx-proxy.conf.template > nginx.conf
+
+      - name: Deploy config to remote server via SSH
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "nginx.conf"
+          target: "/tmp/${{ inputs.domain_name }}.conf"
+
+      - name: Run remote setup
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            sudo mv /tmp/${{ inputs.domain_name }}.conf /etc/nginx/sites-available/${{ inputs.domain_name }}.conf
+            sudo ln -sf /etc/nginx/sites-available/${{ inputs.domain_name }}.conf /etc/nginx/sites-enabled/${{ inputs.domain_name }}.conf
+            sudo rm -f /tmp/${{ inputs.domain_name }}.conf
+            sudo nginx -t && sudo systemctl reload nginx
+
+      - name: Clean up local files
+        run: |
+          rm -f nginx.conf
