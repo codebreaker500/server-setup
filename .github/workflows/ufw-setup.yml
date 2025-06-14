@@ -1,0 +1,70 @@
+name: Setup UFW Firewall
+
+on:
+  workflow_call:
+    secrets:
+      SSH_REMOTE_HOST:
+        required: true
+      SSH_REMOTE_USER:
+        required: true
+      SSH_PRIVATE_KEY:
+        required: true
+
+jobs:
+  setup-ufw:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install UFW and Configure Firewall
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_REMOTE_HOST }}
+          username: ${{ secrets.SSH_REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # Install UFW if not installed
+            if ! command -v ufw &> /dev/null; then
+              echo "UFW not found. Installing..."
+              sudo apt update
+              sudo apt install -y ufw
+            else
+              echo "UFW is already installed."
+            fi
+
+            # Allow SSH connections
+            sudo ufw allow OpenSSH
+
+            # Allow HTTP and HTTPS traffic
+            sudo ufw allow 'Nginx Full'
+
+            # Enable UFW
+            sudo ufw enable
+
+            # Show UFW status
+            sudo ufw status verbose
+
+      - name: Test UFW Status
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_REMOTE_HOST }}
+          username: ${{ secrets.SSH_REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "Checking UFW status..."
+            sudo ufw status
+
+      - name: Test SSH Access
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_REMOTE_HOST }}
+          username: ${{ secrets.SSH_REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "Testing SSH access..."
+            ssh -o BatchMode=yes -o ConnectTimeout=5 ${{ secrets.SSH_REMOTE_USER }}@${{ secrets.SSH_REMOTE_HOST }} "echo 'SSH access is working!'"
+
+      - name: Test HTTP Access
+        run: |
+          curl -I http://${{ secrets.SSH_REMOTE_HOST }}

@@ -2,25 +2,28 @@ name: Setup Nginx
 
 on:
   workflow_call:
-    inputs:
-      domain_name:
+    secrets:
+      SSH_REMOTE_HOST:
         required: true
-        type: string
-      proxy_pass:
+      SSH_REMOTE_USER:
         required: true
-        type: string
-      proxy_pass_port:
+      SSH_PRIVATE_KEY:
         required: true
-        type: string
+      DOMAIN_NAME:
+        required: true
+      PROXY_PASS:
+        required: true
+      PROXY_PASS_PORT:
+        required: true
 
 jobs:
   setup-nginx:
     runs-on: ubuntu-latest
 
     env:
-      DOMAIN_NAME: ${{ inputs.domain_name }}
-      PROXY_PASS: ${{ inputs.proxy_pass }}
-      PROXY_PASS_PORT: ${{ inputs.proxy_pass_port }}
+      DOMAIN_NAME: ${{ secrets.DOMAIN_NAME }}
+      PROXY_PASS: ${{ secrets.PROXY_PASS }}
+      PROXY_PASS_PORT: ${{ secrets.PROXY_PASS_PORT }}
 
     steps:
       - name: Checkout code
@@ -33,22 +36,42 @@ jobs:
       - name: Deploy config to remote server via SSH
         uses: appleboy/scp-action@v1
         with:
-          host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USER }}
+          host: ${{ secrets.SSH_REMOTE_HOST }}
+          username: ${{ secrets.SSH_REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "nginx.conf"
-          target: "/tmp/${{ inputs.domain_name }}.conf"
+          target: "/tmp/${{ secrets.DOMAIN_NAME }}.conf"
 
       - name: Run remote setup
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USER }}
+          host: ${{ secrets.SSH_REMOTE_HOST }}
+          username: ${{ secrets.SSH_REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            sudo mv /tmp/${{ inputs.domain_name }}.conf /etc/nginx/sites-available/${{ inputs.domain_name }}.conf
-            sudo ln -sf /etc/nginx/sites-available/${{ inputs.domain_name }}.conf /etc/nginx/sites-enabled/${{ inputs.domain_name }}.conf
-            sudo rm -f /tmp/${{ inputs.domain_name }}.conf
+            # Check if Nginx is installed
+            if ! command -v nginx &> /dev/null; then
+              echo "Nginx not found. Installing..."
+              sudo apt update
+              sudo apt install -y nginx
+            else
+              echo "Nginx is already installed."
+            fi
+
+            # Check if Nginx is enabled, enable if not
+            if ! systemctl is-enabled nginx >/dev/null 2>&1; then
+              echo "Nginx is not enabled. Enabling now..."
+              sudo systemctl enable nginx
+            else
+              echo "Nginx is already enabled."
+            fi
+
+            # Move the Nginx config file and set up the symlink
+            sudo mv /tmp/${{ secrets.DOMAIN_NAME }}.conf /etc/nginx/sites-available/${{ secrets.DOMAIN_NAME }}.conf
+            sudo ln -sf /etc/nginx/sites-available/${{ secrets.DOMAIN_NAME }}.conf /etc/nginx/sites-enabled/${{ secrets.DOMAIN_NAME }}.conf
+            sudo rm -f /tmp/${{ secrets.DOMAIN_NAME }}.conf
+            
+            # Test Nginx configuration and reload
             sudo nginx -t && sudo systemctl reload nginx
 
       - name: Clean up local files

@@ -2,9 +2,23 @@ name: Setup SSL Certificate
 
 on:
   workflow_call:
-    inputs:
-      domain_name:
+    secrets:
+      SSH_REMOTE_HOST:
         required: true
+      SSH_REMOTE_USER:
+        required: true
+      SSH_PRIVATE_KEY:
+        required: true
+      DOMAIN_NAME:
+        required: true
+      PROXY_PASS:
+        required: true
+      PROXY_PASS_PORT:
+        required: true
+    inputs:
+      EMAIL_SSL:
+        description: 'Email for SSL certificate registration'
+        required: false
         type: string
 
 jobs:
@@ -23,8 +37,8 @@ jobs:
       - name: Install Certbot if not installed
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USER }}
+          host: ${{ secrets.SSH_REMOTE_HOST }}
+          username: ${{ secrets.SSH_REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             if ! command -v certbot &> /dev/null; then
@@ -41,8 +55,8 @@ jobs:
       - name: SSL Configuration
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USER }}
+          host: ${{ secrets.SSH_REMOTE_HOST }}
+          username: ${{ secrets.SSH_REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            sudo certbot --nginx -d ${{ inputs.domain_name }} --email ${{ env.EMAIL }} --agree-tos --non-interactive
+            sudo certbot --nginx -d ${{ secrets.DOMAIN_NAME }} --email ${{ inputs.EMAIL_SSL || secrets.EMAIL_SSL }} --agree-tos --non-interactive
