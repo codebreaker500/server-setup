@@ -31,7 +31,7 @@ jobs:
 
       - name: Generate Nginx config
         run: |
-          envsubst '${DOMAIN_NAME} ${PROXY_PASS} ${PROXY_PASS_PORT}' < nginx-proxy.conf.template > nginx.conf
+          envsubst '${DOMAIN_NAME} ${PROXY_PASS} ${PROXY_PASS_PORT}' < nginx/nginx-proxy.conf.template > nginx.conf
 
       - name: Deploy config to remote server via SSH
         uses: appleboy/scp-action@v1

@@ -59,4 +59,8 @@ jobs:
           username: ${{ secrets.SSH_REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            sudo certbot --nginx -d ${{ secrets.DOMAIN_NAME }} --email ${{ inputs.EMAIL_SSL || secrets.EMAIL_SSL }} --agree-tos --non-interactive
+            # Obtain or renew SSL certificate
+            sudo certbot certonly --nginx -d ${{ secrets.DOMAIN_NAME }} --email ${{ inputs.EMAIL_SSL || secrets.EMAIL_SSL }} --agree-tos --non-interactive || true
+
+            # Renew all certificates if they are due
+            sudo certbot renew --quiet --deploy-hook "sudo systemctl reload nginx"

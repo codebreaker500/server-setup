@@ -1,0 +1,8 @@
+name: Setup Cloudflare Zones
+
+on:
+  workflow_call:
+
+jobs:
+  setup-ssl:
+    runs-on: ubuntu-latest
