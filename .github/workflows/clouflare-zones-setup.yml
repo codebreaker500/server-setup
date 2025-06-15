@@ -4,5 +4,10 @@ on:
   workflow_call:
 
 jobs:
-  setup-ssl:
+  setup-zones:
     runs-on: ubuntu-latest
+    steps:
+        - name: Add subdomain DNS record
+          run: | 
+            echo "Adding DNS record for domain zones"
+        
